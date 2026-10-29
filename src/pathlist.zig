@@ -57,9 +57,9 @@ pub fn normalize(alloc: Allocator, game: Game, path: []const u8) !?[]const u8 {
     }
     const rest = parts.items[start..];
 
-    // whatever extension it had becomes .wem, same as build's first `.` cut
+    // replace only the final filename extension, keeping dots in the stem
     const name = rest[rest.len - 1];
-    const stem = name[0 .. std.mem.indexOfScalar(u8, name, '.') orelse name.len];
+    const stem = name[0 .. std.mem.lastIndexOfScalar(u8, name, '.') orelse name.len];
     if (stem.len == 0) return null;
 
     var out: std.ArrayList(u8) = .empty;
@@ -97,4 +97,22 @@ test parse {
     try std.testing.expectEqual(2, got.len);
     try std.testing.expectEqualStrings("VO_AQ\\a.wem", got[0]);
     try std.testing.expectEqualStrings("VO_AQ\\b.wem", got[1]);
+}
+
+test "text imports preserve dots in directory and file names" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    const paths = try parse(
+        a,
+        .hkrpg,
+        "hash\tpath\r\n" ++
+            "23ee2e30638cb6b7\tChinese(PRC)/voice/chapter4/64.5/danfeng/chapter4_64.5_danfeng_101.wem\r\n" ++
+            "a252fa3a0496e359\tvoice\\chapter4\\64.5\\danheng\\chapter4_64.5_danheng_101.ogg\r\n" ++
+            "voice/chapter4/64/hysilens/chapter4_64_hysilens_113_m\n",
+    );
+    try std.testing.expectEqual(@as(usize, 3), paths.len);
+    try std.testing.expectEqualStrings("voice\\chapter4\\64.5\\danfeng\\chapter4_64.5_danfeng_101.wem", paths[0]);
+    try std.testing.expectEqualStrings("voice\\chapter4\\64.5\\danheng\\chapter4_64.5_danheng_101.wem", paths[1]);
+    try std.testing.expectEqualStrings("voice\\chapter4\\64\\hysilens\\chapter4_64_hysilens_113_m.wem", paths[2]);
 }
